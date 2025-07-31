@@ -20,7 +20,8 @@
             const [inputs, setInputs] = useState({
                 totalUnits: 7000,
                 annualTurnoverRate: 50,
-                takeUpRate: 65,
+                insuranceRequirement: 'required', // 'required' or 'optional'
+                conversionRate: 80,
                 averagePremium: 180,
                 avgPolicyLifetime: 2.0,
                 growthRate: 5,
@@ -29,10 +30,19 @@
             });
 
             const handleInputChange = (field, value) => {
-                setInputs(prev => ({
-                    ...prev,
-                    [field]: parseFloat(value) || 0
-                }));
+                setInputs(prev => {
+                    const newInputs = {
+                        ...prev,
+                        [field]: field === 'insuranceRequirement' ? value : parseFloat(value) || 0
+                    };
+                    
+                    // Auto-adjust conversion rate when insurance requirement changes
+                    if (field === 'insuranceRequirement') {
+                        newInputs.conversionRate = value === 'required' ? 80 : 25;
+                    }
+                    
+                    return newInputs;
+                });
             };
 
             const calculations = useMemo(() => {
@@ -45,7 +55,7 @@
                 for (let year = 1; year <= inputs.timeHorizon; year++) {
                     const adjustedUnits = inputs.totalUnits * Math.pow((1 + inputs.growthRate / 100), year - 1);
                     const newMoveIns = adjustedUnits * (inputs.annualTurnoverRate / 100);
-                    const newPolicies = newMoveIns * (inputs.takeUpRate / 100);
+                    const newPolicies = newMoveIns * (inputs.conversionRate / 100);
                     const retainedPolicies = year === 1 ? 0 : results[year - 2].endingPolicies * annualRetentionRate;
                     const totalPolicies = newPolicies + retainedPolicies;
                     const yearGWP = totalPolicies * inputs.averagePremium;
@@ -135,15 +145,38 @@
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Take-up Rate (%)
+                                            Insurance Requirement
+                                        </label>
+                                        <select
+                                            value={inputs.insuranceRequirement}
+                                            onChange={(e) => handleInputChange('insuranceRequirement', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="required">Required by Property</option>
+                                            <option value="optional">Optional/Recommended</option>
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {inputs.insuranceRequirement === 'required' 
+                                                ? 'All residents must have insurance' 
+                                                : 'Insurance offered as option during move-in'}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Conversion Rate (%)
                                         </label>
                                         <input
                                             type="number"
-                                            value={inputs.takeUpRate}
-                                            onChange={(e) => handleInputChange('takeUpRate', e.target.value)}
+                                            value={inputs.conversionRate}
+                                            onChange={(e) => handleInputChange('conversionRate', e.target.value)}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
-                                        <p className="text-xs text-gray-500 mt-1">% of new move-ins who purchase insurance</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {inputs.insuranceRequirement === 'required' 
+                                                ? '% who choose your solution (typical: 70-95%)' 
+                                                : '% of new residents who purchase insurance (typical: 15-40%)'}
+                                        </p>
                                     </div>
 
                                     <div>
@@ -300,9 +333,9 @@
                             <div className="bg-amber-50 rounded-lg p-6 border border-amber-200">
                                 <h3 className="text-lg font-semibold text-amber-800 mb-3">Key Assumptions & Logic</h3>
                                 <ul className="text-sm text-amber-700 space-y-2">
-                                    <li>• <strong>Corrected Logic:</strong> Only new move-ins are eligible for insurance, not all units</li>
+                                    <li>• <strong>Scenario:</strong> Insurance is {inputs.insuranceRequirement === 'required' ? 'required by property' : 'optional/recommended'}</li>
                                     <li>• New move-ins each year = Total Units × Annual Turnover Rate ({inputs.annualTurnoverRate}%)</li>
-                                    <li>• New policies = New move-ins × Take-up Rate ({inputs.takeUpRate}%)</li>
+                                    <li>• New policies = New move-ins × Conversion Rate ({inputs.conversionRate}%)</li>
                                     <li>• Policy lifetime of {inputs.avgPolicyLifetime} years = {(calculations[0]?.retentionRate || 0).toFixed(1)}% annual retention</li>
                                     <li>• Retained policies = Previous year policies × Retention rate</li>
                                     <li>• Portfolio growth compounds annually at {inputs.growthRate}% rate</li>
